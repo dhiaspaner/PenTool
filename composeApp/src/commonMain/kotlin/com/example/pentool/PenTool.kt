@@ -9,6 +9,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.runtime.mutableStateListOf
+import com.example.pentool.models.AnchorPoint
+import com.example.pentool.models.ControlHandle
+import com.example.pentool.models.CurveSegment
+import com.example.pentool.models.PenToolCurveModel
 
 
 class PenTool {
@@ -16,135 +20,28 @@ class PenTool {
     private val _anchorPoints = mutableStateListOf<AnchorPoint>()
     val anchorPoints: List<AnchorPoint> get()  = _anchorPoints
 
+    var currentModel: PenToolCurveModel? = null
+
     var strokeWidth: Float by mutableStateOf(2f)
     var strokeColor: Color by mutableStateOf(Color.Blue)
     var isClosed: Boolean by mutableStateOf(false)
 
     private val path = Path()
 
-    fun DrawScope.drawCurve() {
-        if (_segments.isEmpty()) return
-
-        path.apply {
-            reset()
-            _segments.forEachIndexed { index, segment ->
-                if (index == 0) initialMove(segment)
-                drawSegment(segment)
-            }
-
-            if (isClosed) close()
-
-            drawPath(
-                path = this,
-                style = Stroke(width = strokeWidth),
-                color = strokeColor
-            )
-        }
-    }
-
-
-    fun Path.initialMove(segment: CurveSegment) {
-        when (segment) {
-            is CurveSegment.Line -> {
-                moveTo(segment.startPoint.position.x, segment.startPoint.position.y)
-            }
-
-            is CurveSegment.QuadraticBezier -> {
-                moveTo(segment.startPoint.position.x, segment.startPoint.position.y)
-            }
-
-            is CurveSegment.CubicBezier -> {
-                moveTo(segment.startPoint.position.x, segment.startPoint.position.y)
-            }
-        }
-    }
-
-
-    fun Path.drawSegment(segment: CurveSegment) {
-        when (segment) {
-            is CurveSegment.Line -> {
-                lineTo(
-                    x = segment.endPoint.position.x,
-                    y = segment.endPoint.position.y
-                )
-            }
-
-            is CurveSegment.QuadraticBezier -> {
-                quadraticTo(
-                    x1 = segment.controlPoint.position.x,
-                    y1  = segment.controlPoint.position.y,
-                    x2 = segment.endPoint.position.x,
-                    y2 = segment.endPoint.position.y
-                )
-            }
-
-            is CurveSegment.CubicBezier -> {
-                cubicTo(
-                    segment.controlPoint1.position.x, segment.controlPoint1.position.y,
-                    segment.controlPoint2.position.x, segment.controlPoint2.position.y,
-                    segment.endPoint.position.x, segment.endPoint.position.y
-                )
-            }
-        }
-    }
-
-    fun DrawScope.drawAnchorsAndHandles(showHandles: Boolean = true) {
-        _anchorPoints.forEach { anchor ->
-            // Draw anchor point
-            drawCircle(
-                radius = if (anchor.isSelected) 6f else 4f,
-                center = anchor.position,
-                color = if (anchor.isSelected) Color.Red else Color.Magenta
-            )
-
-            if (showHandles) {
-                // Draw incoming handle
-                anchor.inHandle?.takeIf { it.isVisible }?.let { handle ->
-                    drawLine(
-                        color = if (handle.isSelected) Color.Blue else Color.Gray,
-                        strokeWidth = 1f,
-                        start = anchor.position,
-                        end = handle.position
-                    )
-                    drawCircle(
-                        radius = 3f,
-                        center = handle.position,
-                        color = Color.Cyan
-                    )
-                }
-
-                // Draw outgoing handle
-                anchor.outHandle?.takeIf { it.isVisible }?.let { handle ->
-                    drawLine(
-                        color = if (handle.isSelected) Color.Blue else Color.Gray,
-                        strokeWidth = 1f,
-                        start = anchor.position,
-                        end = handle.position
-                    )
-                    drawCircle(
-                        radius = 3f,
-                        center = handle.position,
-                        color = Color.Cyan
-                    )
-                }
-            }
-        }
-    }
-
     fun DrawScope.drawNextSegment(end: AnchorPoint) {
         val start = _anchorPoints.lastOrNull() ?: return
         val segment = createSegmentBetween(start, end)
-        val path = Path()
-        path.apply {
-            initialMove(segment)
-            drawSegment(segment)
-            drawPath(
-                path = this,
-                style = Stroke(width = strokeWidth),
-                color = strokeColor.copy(alpha = 0.6f),
-            )
+        currentModel?.run {
+            path.apply {
+                initialMove(segment)
+                drawSegment(segment)
+                drawPath(
+                    path = this,
+                    style = Stroke(width = strokeWidth),
+                    color = strokeColor.copy(alpha = 0.6f),
+                )
+            }
         }
-
 
 
 
@@ -152,18 +49,19 @@ class PenTool {
 
     // Hit testing
     fun hitTestAnchor(point: Offset, tolerance: Float = 10f): AnchorPoint? {
-        return _anchorPoints.find { it.distanceTo(point) <= tolerance }
+
+        return _anchorPoints.find { it.position.distanceTo(other = point) <= tolerance }
     }
 
     fun hitTestHandle(point: Offset, tolerance: Float = 8f): Pair<AnchorPoint, ControlHandle>? {
         _anchorPoints.forEach { anchor ->
             anchor.inHandle?.let { handle ->
-                if (handle.distanceTo(point) <= tolerance) {
+                if (handle.position.distanceTo(other = point) <= tolerance) {
                     return anchor to handle
                 }
             }
             anchor.outHandle?.let { handle ->
-                if (handle.distanceTo(point) <= tolerance) {
+                if (handle.position.distanceTo(other = point) <= tolerance) {
                     return anchor to handle
                 }
             }

@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.pentool.models.AnchorPoint
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 enum class PenToolMode {
@@ -37,7 +38,6 @@ fun App() {
 
                 curveState.run {
                     penTool.run {
-                        drawCurve()
                         drawAnchorsAndHandles(showHandles = true)
                         drawNextSegment(AnchorPoint(cursorPosition))
                     }
